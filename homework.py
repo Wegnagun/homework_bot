@@ -7,6 +7,7 @@ import telegram
 from telegram import ReplyKeyboardMarkup, Bot
 from telegram.ext import CommandHandler, Updater
 import time
+import emojis
 
 load_dotenv()
 
@@ -18,6 +19,7 @@ TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHATID')
 RETRY_TIME = 600
 ENDPOINT = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
 HEADERS = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
+# verdict = []
 
 
 HOMEWORK_STATUSES = {
@@ -56,21 +58,21 @@ def check_response(response):
         homework = response['homeworks']
         return homework
     except KeyError as ex:
-        print('dddd')
+        print(ex)
 
 
 def parse_status(homework):
     """парсим данные с ответа яндекс.домашка"""
-    homework_name = homework['homework_name']
-    homework_status = ...
-
-    ...
-
-    verdict = homework['status']
-
-    ...
-
-    return f'Изменился статус проверки работы "{homework_name}". {verdict}'
+    global verdict
+    homework_name = homework[0]['homework_name']
+    homework_status = homework[0]['status']
+    verdict = HOMEWORK_STATUSES[homework_status]
+    if homework_status != homework_status:
+        verdict = HOMEWORK_STATUSES[homework_status]
+        return f'Изменился статус проверки работы "{homework_name}". {verdict}'
+    else:
+        verdict = HOMEWORK_STATUSES[homework_status]
+        return 'работа еще не на проверке'
 
 
 def check_tokens():
@@ -85,21 +87,20 @@ def check_tokens():
 
 def main():
     """Основная логика работы бота."""
-
-    ...
-
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     current_timestamp = int(time.time())
 
     while True:
         try:
-            response = get_api_answer(current_timestamp)
+            print('ща узнаем шо там по проверке')
+            response = get_api_answer(current_timestamp - 2592000)
             homework = check_response(response)
+            print(parse_status(homework), homework)
             current_timestamp = int(time.time())
-            time.sleep(RETRY_TIME)
-            parse_status(homework)
+            time.sleep(5)
         except Exception as error:
-            message = f'Сбой в работе программы: {error}'
+            message = (f'Сбой в работе программы: {error} '
+                       + emojis.encode(':sob:'))
             send_message(bot, message)
             time.sleep(RETRY_TIME)
         else:
@@ -107,5 +108,7 @@ def main():
 
 
 if __name__ == '__main__':
-    print(get_api_answer(1653481042 - 2592000)['homeworks'])
-    # main()
+    # foo = get_api_answer(1653481042 - 2592000)['homeworks']
+    # print(parse_status(foo))
+    # print(get_api_answer(1653481042 - 2592000)['homeworks'])
+    main()
