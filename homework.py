@@ -11,16 +11,14 @@ import emojis
 
 load_dotenv()
 
-
 PRACTICUM_TOKEN = os.getenv('PRACTICUM')
 TELEGRAM_TOKEN = os.getenv('TELEGRAM')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHATID')
+homework_status = None
 
 RETRY_TIME = 600
 ENDPOINT = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
 HEADERS = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
-# verdict = []
-
 
 HOMEWORK_STATUSES = {
     'approved': 'Работа проверена: ревьюеру всё понравилось. Ура!',
@@ -50,10 +48,16 @@ def get_api_answer(current_timestamp):
     """ получаем ответ с API домашки """
     timestamp = current_timestamp or int(time.time())
     params = {'from_date': timestamp}
-    return requests.get(ENDPOINT, headers=HEADERS, params=params).json()
+    try:
+        request = requests.get(ENDPOINT, headers=HEADERS, params=params)
+        request.raise_for_status()
+        return request.json()
+    except requests.exceptions.HTTPError as error:
+        raise SystemExit(error)
 
 
 def check_response(response):
+    """проверяем наличии в респонсе словаря homeworks"""
     try:
         homework = response['homeworks']
         return homework
@@ -63,16 +67,14 @@ def check_response(response):
 
 def parse_status(homework):
     """парсим данные с ответа яндекс.домашка"""
-    global verdict
+    global homework_status
     homework_name = homework[0]['homework_name']
-    homework_status = homework[0]['status']
-    verdict = HOMEWORK_STATUSES[homework_status]
-    if homework_status != homework_status:
+    if homework_status != homework[0]['status']:
+        homework_status = homework[0]['status']
         verdict = HOMEWORK_STATUSES[homework_status]
         return f'Изменился статус проверки работы "{homework_name}". {verdict}'
     else:
-        verdict = HOMEWORK_STATUSES[homework_status]
-        return 'работа еще не на проверке'
+        return 'Статус проверки работы пока не изменился'
 
 
 def check_tokens():
@@ -87,28 +89,38 @@ def check_tokens():
 
 def main():
     """Основная логика работы бота."""
-    bot = telegram.Bot(token=TELEGRAM_TOKEN)
-    current_timestamp = int(time.time())
-
-    while True:
-        try:
-            print('ща узнаем шо там по проверке')
-            response = get_api_answer(current_timestamp - 2592000)
-            homework = check_response(response)
-            print(parse_status(homework), homework)
-            current_timestamp = int(time.time())
-            time.sleep(5)
-        except Exception as error:
-            message = (f'Сбой в работе программы: {error} '
-                       + emojis.encode(':sob:'))
-            send_message(bot, message)
-            time.sleep(RETRY_TIME)
-        else:
-            pass
+    if check_tokens():
+        bot = telegram.Bot(token=TELEGRAM_TOKEN)
+        send_message(bot,
+                     'Начинаю запрашивать информацию о статусе домашки'
+                     + emojis.encode(':sob:'))
+        while True:
+            try:
+                logger.debug('Запуск')
+                current_timestamp = int(time.time())
+                response = get_api_answer(current_timestamp - 2592000)
+                homework = check_response(response)
+                send_message(bot, parse_status(homework))
+                time.sleep(5)
+            except Exception as error:
+                message = (f'Сбой в работе программы: {error} '
+                           + emojis.encode(':sob:'))
+                send_message(bot, message)
+                time.sleep(RETRY_TIME)
+            else:
+                # какой-то конец
+                pass
+    else:
+        logger.error('Ошибка, проверьте токены в .env')
 
 
 if __name__ == '__main__':
-    # foo = get_api_answer(1653481042 - 2592000)['homeworks']
-    # print(parse_status(foo))
-    # print(get_api_answer(1653481042 - 2592000)['homeworks'])
+    # try:
+    #     current_timestamp = int(time.time())
+    #     timestamp = current_timestamp - 2592000
+    #     params = {'from_date': timestamp}
+    #     request = requests.get(ENDPOINT, headers=HEADERS, params=0)
+    #     request.raise_for_status()
+    # except requests.exceptions.HTTPError as error:
+    #     raise SystemExit(error)
     main()
