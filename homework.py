@@ -144,5 +144,9 @@ def main():
 if __name__ == '__main__':
     current_time_for_check = int(time.time())
     response_for_check = get_api_answer(current_time_for_check - TWO_MONTH)
-    print(response_for_check)
-    # main()
+    if type(response_for_check) == dict and len(response_for_check) != 0:
+        main()
+    else:
+        logger.critical('запрос не вернул словарь или вернул пустой словарь')
+        raise CheckStartResponseType(
+            'запрос не вернул словарь или вернул пустой словарь')
