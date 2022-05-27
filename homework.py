@@ -62,7 +62,8 @@ def get_api_answer(current_timestamp):
         logger.info(f'Ответ сервера {homework_statuses.status_code}')
         if homework_statuses.status_code != HTTPStatus.OK:
             logger.error(f'Ошибка {homework_statuses.status_code}!')
-            raise ResponseException(f'Ошибка {homework_statuses.status_code}!')
+            raise ResponseException(
+                f'код ответа{homework_statuses.status_code}!')
         return homework_statuses.json()
     except requests.ConnectionError:
         logger.error(f'Адрес {ENDPOINT} недоступен!')
@@ -71,22 +72,18 @@ def get_api_answer(current_timestamp):
 
 def check_response(response):
     """проверяем наличии в респонсе словаря homeworks"""
-    try:
-        homework = response['homeworks']
-        if type(homework) != list:
-            logger.error('в респонсе содержится не list')
-            raise TypeError('в респонсе содержится не list')
-        else:
-            return homework[0]
-    except KeyError:
-        raise KeyError('вот беда, ай-ай-ай')
+    homework = response['homeworks']
+    if type(homework) != list:
+        logger.error('в респонсе содержится не list')
+        raise TypeError('в респонсе содержится не list')
+    else:
+        return homework[0]
 
 
 def parse_status(homework):
     """парсим данные с ответа яндекс.домашка"""
     global homework_status
-    if homework['homework_name'] not in homework:
-        print(homework)
+    if 'homework_name' not in homework:
         logger.error('ключа "homework_name" нет в homework')
         raise KeyError('ключа "homework_name" нет в homework')
     else:
@@ -118,7 +115,7 @@ def main():
     if check_tokens():
         bot = telegram.Bot(token=TELEGRAM_TOKEN)
         send_message(bot,
-                     'Начинаю запрашивать информацию о статусе домашки'
+                     'Начинаю запрашивать информацию о статусе домашки '
                      + emojis.encode(':smile:'))
         while True:
             try:

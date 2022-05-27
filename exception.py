@@ -3,12 +3,27 @@ from telegram.error import TelegramError
 
 
 class ResponseException(requests.exceptions.RequestException):
-    pass
+    def __init__(self, *args):
+        super().__init__(*args)
+        self.msg = args[0] if args else None
+
+    def __str__(self):
+        return f'Ошибка: {self.msg}!'
 
 
 class ApiUnavailable(requests.ConnectionError):
-    pass
+    def __init__(self, *args):
+        super().__init__(*args)
+        self.msg = args[0] if args else None
+
+    def __str__(self):
+        return f'Ошибка: {self.msg}!'
 
 
 class MessageDontSent(TelegramError):
-    pass
+    def __init__(self, *args):
+        super().__init__(*args)
+        self.msg = args[0] if args else None
+
+    def __str__(self):
+        return f'Ошибка: {self.msg}!'
