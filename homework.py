@@ -4,11 +4,9 @@ import sys
 import time
 from http import HTTPStatus
 
-import emojis
 import requests
 import telegram
 from dotenv import load_dotenv
-
 from exception import (ResponseException,
                        ApiUnavailable,
                        MessageDontSent,
@@ -84,8 +82,7 @@ def check_response(response):
     else:
         if len(homework) == 0:
             logger.error('респонс вернул пустой список')
-            raise TypeError(
-                f"респонс вернул пустой список {emojis.encode(':sob:')}")
+            raise TypeError("респонс вернул пустой список")
         else:
             return homework[0]
 
@@ -125,8 +122,7 @@ def main():
     if check_tokens():
         bot = telegram.Bot(token=TELEGRAM_TOKEN)
         send_message(bot,
-                     'Начинаю запрашивать информацию о статусе домашки '
-                     + emojis.encode(':smile:'))
+                     'Начинаю запрашивать информацию о статусе домашки ')
         while True:
             try:
                 logger.debug('Запуск')
@@ -136,8 +132,7 @@ def main():
                 send_message(bot, parse_status(homework))
                 time.sleep(RETRY_TIME)
             except Exception as error:
-                message = (f'Сбой в работе программы: {error} '
-                           + emojis.encode(':sob:'))
+                message = f'Сбой в работе программы: {error}'
                 send_message(bot, message)
                 time.sleep(RETRY_TIME)
     else:
