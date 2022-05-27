@@ -16,6 +16,8 @@ load_dotenv()
 PRACTICUM_TOKEN = os.getenv('PRACTICUM')
 TELEGRAM_TOKEN = os.getenv('TELEGRAM')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHATID')
+TWO_MONTH = 2592000
+
 homework_status = None
 
 RETRY_TIME = 600
@@ -41,7 +43,7 @@ logger.addHandler(handler)
 
 
 def send_message(bot, message):
-    """ Отправка ботом сообщений в чат """
+    """Отправка ботом сообщений в чат."""
     logger.info('отправка сообщения')
     try:
         return bot.send_message(TELEGRAM_CHAT_ID, message)
@@ -50,7 +52,7 @@ def send_message(bot, message):
 
 
 def get_api_answer(current_timestamp):
-    """ получаем ответ с API домашки """
+    """получаем ответ с API домашки."""
     timestamp = current_timestamp
     params = {'from_date': timestamp}
     try:
@@ -71,17 +73,22 @@ def get_api_answer(current_timestamp):
 
 
 def check_response(response):
-    """проверяем наличии в респонсе словаря homeworks"""
+    """проверяем наличии в респонсе словаря homeworks."""
     homework = response['homeworks']
     if type(homework) != list:
         logger.error('в респонсе содержится не list')
         raise TypeError('в респонсе содержится не list')
     else:
-        return homework[0]
+        if len(homework) == 0:
+            logger.error('респонс вернул пустой список')
+            raise TypeError(
+                f"респонс вернул пустой список {emojis.encode(':sob:')}")
+        else:
+            return homework[0]
 
 
 def parse_status(homework):
-    """парсим данные с ответа яндекс.домашка"""
+    """парсим данные с ответа яндекс.домашка."""
     global homework_status
     if 'homework_name' not in homework:
         logger.error('ключа "homework_name" нет в homework')
@@ -101,7 +108,7 @@ def parse_status(homework):
 
 
 def check_tokens():
-    """ проверяем доступность переменных окружения """
+    """проверяем доступность переменных окружения."""
     if (PRACTICUM_TOKEN is not None
             and TELEGRAM_TOKEN is not None
             and TELEGRAM_CHAT_ID is not None):
@@ -121,8 +128,7 @@ def main():
             try:
                 logger.debug('Запуск')
                 current_timestamp = int(time.time())
-                two_month = 2592000
-                response = get_api_answer(current_timestamp - two_month)
+                response = get_api_answer(current_timestamp - TWO_MONTH)
                 homework = check_response(response)
                 send_message(bot, parse_status(homework))
                 time.sleep(RETRY_TIME)
@@ -136,4 +142,7 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    current_time_for_check = int(time.time())
+    response_for_check = get_api_answer(current_time_for_check - TWO_MONTH)
+    print(response_for_check)
+    # main()
