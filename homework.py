@@ -9,7 +9,10 @@ import requests
 import telegram
 from dotenv import load_dotenv
 
-from exception import ResponseException, ApiUnavailable, MessageDontSent
+from exception import (ResponseException,
+                       ApiUnavailable,
+                       MessageDontSent,
+                       CheckStartResponseType)
 
 load_dotenv()
 
