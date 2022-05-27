@@ -1,13 +1,15 @@
 import logging
-import sys
 import os
-import requests
-from dotenv import load_dotenv
-import telegram
-from telegram import ReplyKeyboardMarkup, Bot
-from telegram.ext import CommandHandler, Updater
+import sys
 import time
+from http import HTTPStatus
+
 import emojis
+import requests
+import telegram
+from dotenv import load_dotenv
+
+from exception import ResponseException, ApiUnavailable, MessageDontSent
 
 load_dotenv()
 
@@ -41,40 +43,64 @@ logger.addHandler(handler)
 def send_message(bot, message):
     """ Отправка ботом сообщений в чат """
     logger.info('отправка сообщения')
-    return bot.send_message(TELEGRAM_CHAT_ID, message)
+    try:
+        return bot.send_message(TELEGRAM_CHAT_ID, message)
+    except MessageDontSent:
+        logger.error('не удалось отправить сообщение')
 
 
 def get_api_answer(current_timestamp):
     """ получаем ответ с API домашки """
-    timestamp = current_timestamp or int(time.time())
+    timestamp = current_timestamp
     params = {'from_date': timestamp}
     try:
-        request = requests.get(ENDPOINT, headers=HEADERS, params=params)
-        request.raise_for_status()
-        return request.json()
-    except requests.exceptions.HTTPError as error:
-        raise SystemExit(error)
+        homework_statuses = requests.get(
+            url=ENDPOINT,
+            headers=HEADERS,
+            params=params,
+        )
+        logger.info(f'Ответ сервера {homework_statuses.status_code}')
+        if homework_statuses.status_code != HTTPStatus.OK:
+            logger.error(f'Ошибка {homework_statuses.status_code}!')
+            raise ResponseException(f'Ошибка {homework_statuses.status_code}!')
+        return homework_statuses.json()
+    except requests.ConnectionError:
+        logger.error(f'Адрес {ENDPOINT} недоступен!')
+        raise ApiUnavailable(f'Адрес {ENDPOINT} недоступен!')
 
 
 def check_response(response):
     """проверяем наличии в респонсе словаря homeworks"""
     try:
         homework = response['homeworks']
-        return homework
-    except KeyError as ex:
-        print(ex)
+        if type(homework) != list:
+            logger.error('в респонсе содержится не list')
+            raise TypeError('в респонсе содержится не list')
+        else:
+            return homework[0]
+    except KeyError:
+        raise KeyError('вот беда, ай-ай-ай')
 
 
 def parse_status(homework):
     """парсим данные с ответа яндекс.домашка"""
     global homework_status
-    homework_name = homework[0]['homework_name']
-    if homework_status != homework[0]['status']:
-        homework_status = homework[0]['status']
+    if homework['homework_name'] not in homework:
+        print(homework)
+        logger.error('ключа "homework_name" нет в homework')
+        raise KeyError('ключа "homework_name" нет в homework')
+    else:
+        homework_name = homework['homework_name']
+    if homework['status'] not in HOMEWORK_STATUSES:
+        logger.error('такой статус проверки не известен')
+        raise KeyError(f"статуса {homework['status']} нет в HOMEWORK_STATUSES")
+    if homework_status != homework['status']:
+        homework_status = homework['status']
         verdict = HOMEWORK_STATUSES[homework_status]
         return f'Изменился статус проверки работы "{homework_name}". {verdict}'
     else:
-        return 'Статус проверки работы пока не изменился'
+        logger.debug('статус работы не изменился')
+        return 'статус проверки работы не изменился'
 
 
 def check_tokens():
@@ -93,34 +119,24 @@ def main():
         bot = telegram.Bot(token=TELEGRAM_TOKEN)
         send_message(bot,
                      'Начинаю запрашивать информацию о статусе домашки'
-                     + emojis.encode(':sob:'))
+                     + emojis.encode(':smile:'))
         while True:
             try:
                 logger.debug('Запуск')
                 current_timestamp = int(time.time())
-                response = get_api_answer(current_timestamp - 2592000)
+                two_month = 2592000
+                response = get_api_answer(current_timestamp - two_month)
                 homework = check_response(response)
                 send_message(bot, parse_status(homework))
-                time.sleep(5)
+                time.sleep(RETRY_TIME)
             except Exception as error:
                 message = (f'Сбой в работе программы: {error} '
                            + emojis.encode(':sob:'))
                 send_message(bot, message)
                 time.sleep(RETRY_TIME)
-            else:
-                # какой-то конец
-                pass
     else:
-        logger.error('Ошибка, проверьте токены в .env')
+        logger.critical('Ошибка, проверьте токены в .env')
 
 
 if __name__ == '__main__':
-    # try:
-    #     current_timestamp = int(time.time())
-    #     timestamp = current_timestamp - 2592000
-    #     params = {'from_date': timestamp}
-    #     request = requests.get(ENDPOINT, headers=HEADERS, params=0)
-    #     request.raise_for_status()
-    # except requests.exceptions.HTTPError as error:
-    #     raise SystemExit(error)
     main()
