@@ -7,10 +7,9 @@ from http import HTTPStatus
 import requests
 import telegram
 from dotenv import load_dotenv
-from exception import (ResponseException,
-                       ApiUnavailable,
-                       MessageDontSent,
-                       CheckStartResponseType)
+from telegram.error import TelegramError
+
+from exception import ServerError, CriticalSystemErrors
 
 load_dotenv()
 
@@ -25,37 +24,34 @@ RETRY_TIME = 600
 ENDPOINT = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
 HEADERS = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
 
-HOMEWORK_STATUSES = {
+HOMEWORK_VERDICTS = {
     'approved': 'Работа проверена: ревьюеру всё понравилось. Ура!',
     'reviewing': 'Работа взята на проверку ревьюером.',
     'rejected': 'Работа проверена: у ревьюера есть замечания.'
 }
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    filename='main.log',
-    format='%(asctime)s, %(levelname)s, %(message)s, %(name)s'
-)
-
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-handler = logging.StreamHandler(stream=sys.stdout)
-logger.addHandler(handler)
 
 
 def send_message(bot, message):
     """Отправка ботом сообщений в чат."""
-    logger.info('отправка сообщения')
     try:
-        return bot.send_message(TELEGRAM_CHAT_ID, message)
-    except MessageDontSent:
-        logger.error('не удалось отправить сообщение')
+        bot.send_message(555, text=message)
+        logger.info(f'Bot have sent a message: {message}')
+    except telegram.error.TelegramError(message):
+        logger.error(
+            f'Due to an error bot have not sent a message: {message}', sys.exc_info())
+    # try:
+    #     bot.send_message(555, message)
+    # except telegram.error.TelegramError(message):
+    #     return f'не удалось отправить сообщение: "{message}"'
+    # else:
+    #     logger.info('сообщение успешно отправлено')
 
 
 def get_api_answer(current_timestamp):
     """получаем ответ с API домашки."""
-    timestamp = current_timestamp
-    params = {'from_date': timestamp}
+    params = {'from_date': current_timestamp}
     try:
         homework_statuses = requests.get(
             url=ENDPOINT,
@@ -65,12 +61,12 @@ def get_api_answer(current_timestamp):
         logger.info(f'Ответ сервера {homework_statuses.status_code}')
         if homework_statuses.status_code != HTTPStatus.OK:
             logger.error(f'Ошибка {homework_statuses.status_code}!')
-            raise ResponseException(
+            raise Exception(
                 f'код ответа{homework_statuses.status_code}!')
         return homework_statuses.json()
     except requests.ConnectionError:
         logger.error(f'Адрес {ENDPOINT} недоступен!')
-        raise ApiUnavailable(f'Адрес {ENDPOINT} недоступен!')
+        raise Exception(f'Адрес {ENDPOINT} недоступен!')
 
 
 def check_response(response):
@@ -95,12 +91,12 @@ def parse_status(homework):
         raise KeyError('ключа "homework_name" нет в homework')
     else:
         homework_name = homework['homework_name']
-    if homework['status'] not in HOMEWORK_STATUSES:
+    if homework['status'] not in HOMEWORK_VERDICTS:
         logger.error('такой статус проверки не известен')
         raise KeyError(f"статуса {homework['status']} нет в HOMEWORK_STATUSES")
     if homework_status != homework['status']:
         homework_status = homework['status']
-        verdict = HOMEWORK_STATUSES[homework_status]
+        verdict = HOMEWORK_VERDICTS[homework_status]
         return f'Изменился статус проверки работы "{homework_name}". {verdict}'
     else:
         logger.debug('статус работы не изменился')
@@ -135,16 +131,25 @@ def main():
                 message = f'Сбой в работе программы: {error}'
                 send_message(bot, message)
                 time.sleep(RETRY_TIME)
+            except ServerError:
+                logger.info('ошибка: ')
+            else:   # если не возникло исключений
+                pass
+
     else:
         logger.critical('Ошибка, проверьте токены в .env')
 
 
 if __name__ == '__main__':
-    current_time_for_check = int(time.time())
-    response_for_check = get_api_answer(current_time_for_check - TWO_MONTH)
-    if type(response_for_check) == dict and len(response_for_check) != 0:
-        main()
-    else:
-        logger.critical('запрос не вернул словарь или вернул пустой словарь')
-        raise CheckStartResponseType(
-            'запрос не вернул словарь или вернул пустой словарь')
+    # настройка логирования
+    file_handler = logging.FileHandler(
+        filename=os.path.join('main.log'))
+    stdout_handler = logging.StreamHandler(sys.stdout)
+    handlers = [file_handler, stdout_handler]
+    logging.basicConfig(
+        level=logging.DEBUG,
+        handlers=handlers,
+        format='%(asctime)s, %(levelname)s, %(message)s, %(name)s'
+    )
+    ###
+    main()
