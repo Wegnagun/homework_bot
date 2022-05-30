@@ -7,9 +7,35 @@ class HomeWorkBaseException(Exception):
         return f'Ошибка: {self.msg}!'
 
 
-class ServerError(HomeWorkBaseException):
+#############
+# ошибки, не требующие пересылки в телеграм
+#############
+class NotSendsError(HomeWorkBaseException):
     pass
 
 
+class SendMessageError(NotSendsError):
+    pass
+
+
+class ResponseCodeError(NotSendsError):
+    pass
+
+
+class ApiResponseError(NotSendsError):
+    pass
+
+
+class ResponseTypeError(NotSendsError):
+    pass
+
+
+class ResponseContentError(NotSendsError):
+    pass
+
+
+#############
+# ошибки, требующие пересылки в телеграм
+#############
 class CriticalSystemErrors(HomeWorkBaseException):
     pass
