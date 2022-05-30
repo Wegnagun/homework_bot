@@ -14,7 +14,8 @@ from exception import (SendMessageError,
                        ApiResponseError,
                        NotSendsError,
                        ResponseTypeError,
-                       ResponseContentError)
+                       ResponseContentError,
+                       CriticalSystemErrors)
 
 load_dotenv()
 
@@ -86,20 +87,21 @@ def check_response(response):
     homework = response['homeworks']
     if not isinstance(homework, list):
         raise ResponseContentError(
-            f'в респонсе содержится не list: type(homework)={type(homework)}')
+            f'в "homework" содержится не list: '
+            f'type(homework)={type(homework)}')
     return homework
 
 
 def parse_status(homework):
     """парсим данные с ответа яндекс.домашка."""
-    global homework_status
+    logger.info('Начинаем собирать данные из homework')
+    if 'status' not in homework[0]:
+        raise KeyError(f'ключа "status" нет в {homework[0]}')
+    homework_status = homework[0][0].get('status')
     if 'homework_name' not in homework:
-        logger.error('ключа "homework_name" нет в homework')
-        raise KeyError('ключа "homework_name" нет в homework')
-    else:
-        homework_name = homework['homework_name']
-    if homework['status'] not in HOMEWORK_VERDICTS:
-        logger.error('такой статус проверки не известен')
+        raise KeyError(f'ключа "homework_name" нет в {homework[0]}')
+    homework_name = homework[0][0].get('homework_name')
+    if homework_status not in HOMEWORK_VERDICTS:
         raise KeyError(f"статуса {homework['status']} нет в HOMEWORK_STATUSES")
     if homework_status != homework['status']:
         homework_status = homework['status']
@@ -110,6 +112,7 @@ def parse_status(homework):
         return 'статус проверки работы не изменился'
 
 
+# {'homeworks': [{'id': 335134, 'status': 'rejected', 'homework_name': 'Wegnagun__homework_bot.zip', 'reviewer_comment': 'Неплохой старт', 'date_updated': '2022-05-28T23:45:43Z', 'lesson_name': 'Проект спринта: деплой бота'}, {'id': 312446, 'status': 'approved', 'homework_name': 'Wegnagun__hw05_final.zip', 'reviewer_comment': 'Принято, необязательной программной мучать не буду, но советую разобраться.', 'date_updated': '2022-05-14T20:37:58Z', 'lesson_name': 'Проект спринта: подписки на авторов'}], 'current_date': 1653932520}
 def check_tokens():
     """проверяем доступность переменных окружения."""
     if (PRACTICUM_TOKEN is not None
@@ -126,25 +129,22 @@ def main():
         bot = telegram.Bot(token=TELEGRAM_TOKEN)
         send_message(bot,
                      'Начинаю запрашивать информацию о статусе домашки ')
+        current_timestamp = int(time.time())
         while True:
             try:
                 logger.debug('Запуск')
-                current_timestamp = int(time.time())
-                response = get_api_answer(current_timestamp - TWO_MONTH)
+                response = get_api_answer(current_timestamp - RETRY_TIME)
                 homework = check_response(response)
                 send_message(bot, parse_status(homework))
+                current_timestamp = response['current_date']
                 time.sleep(RETRY_TIME)
             except NotSendsError as error:
                 logger.error(error)
-            # except ResponseCodeError as error:
-            #     logger.error(error)
-            except Exception as error:
+            except CriticalSystemErrors as error:
                 message = f'Сбой в работе программы: {error}'
                 logger.error(error)
                 send_message(bot, message)
                 time.sleep(RETRY_TIME)
-            # except ServerError:
-            #     logger.info('ошибка: ')
             else:   # если не возникло исключений
                 pass
 
