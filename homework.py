@@ -34,7 +34,7 @@ HOMEWORK_VERDICTS = {
 logger = logging.getLogger(__name__)
 
 
-def send_message(bot, message):
+def send_message(bot, message: str):
     """Отправка ботом сообщений в чат."""
     try:
         bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
@@ -46,7 +46,7 @@ def send_message(bot, message):
         logger.info('сообщение успешно отправлено')
 
 
-def get_api_answer(current_timestamp):
+def get_api_answer(current_timestamp: int) -> dict:
     """получаем ответ с API домашки."""
     params = {'from_date': current_timestamp}
     url = ENDPOINT
@@ -68,7 +68,7 @@ def get_api_answer(current_timestamp):
         return homework_statuses.json()
 
 
-def check_response(response):
+def check_response(response: dict) -> list:
     """проверяем наличие в респонсе словаря homeworks."""
     logger.info(f'Начинаю проверку ответа сервера ({response})')
     if isinstance(response, list):
@@ -91,7 +91,7 @@ def check_response(response):
     return homework
 
 
-def parse_status(homework):
+def parse_status(homework: dict) -> str:
     """парсим данные с ответа сервера."""
     logger.info('Начинаем собирать данные из homework')
     if 'status' not in homework:
@@ -106,7 +106,7 @@ def parse_status(homework):
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
 
-def check_tokens():
+def check_tokens() -> bool:
     """проверяем доступность переменных окружения."""
     return all([PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID])
 
