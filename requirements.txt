@@ -4,7 +4,6 @@ pytest==6.2.5
 python-dotenv==0.19.0
 python-telegram-bot==13.7
 requests==2.26.0
-emojis==0.6.0
 py~=1.10.0
 pip~=21.3.1
 attrs~=21.2.0

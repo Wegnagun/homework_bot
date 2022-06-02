@@ -4,6 +4,7 @@ import os
 import sys
 import time
 from http import HTTPStatus
+from requests.exceptions import HTTPError
 
 import requests
 import telegram
@@ -39,7 +40,6 @@ def send_message(bot, message: str):
     try:
         bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
     except TelegramError:
-        logger.error(sys.exc_info())
         raise SendMessageError(
             f'не удалось отправить сообщение: "{message}", {sys.exc_info()}')
     else:
@@ -48,22 +48,26 @@ def send_message(bot, message: str):
 
 def get_api_answer(current_timestamp: int) -> dict:
     """получаем ответ с API домашки."""
-    params = {'from_date': current_timestamp}
-    url = ENDPOINT
+    params = {'headers': HEADERS, 'from_date': current_timestamp}
     try:
-        logger.info(f'Начат запрос по адресу {url} '
-                    f'с прамаметрами headers={HEADERS}, params={params}')
-        homework_statuses = requests.get(
-            url=url,
-            headers=HEADERS,
-            params=params,
-        )
-        if homework_statuses.status_code != HTTPStatus.OK:
-            raise ResponseCodeError(
-                f'Ошибка: Ожидался код 200, а получен: '
-                f'{homework_statuses.status_code}!')
+        logger.info(f'Начат запрос по адресу {ENDPOINT} '
+                    f'с прамаметрами {params}')
+        homework_statuses = requests.get(url=ENDPOINT, params=params)
     except Exception:
-        raise ApiResponseError(f'Адрес {ENDPOINT} недоступен!')
+        raise ApiResponseError(
+            f'Адрес {ENDPOINT} недоступен! '
+            f'параметры запроса: {params}, {sys.exc_info()}')
+    if homework_statuses.status_code != HTTPStatus.OK:
+        raise ResponseCodeError(
+            f'Ожидался код 200, а получен: '
+            f'{homework_statuses.status_code}, параметры запроса: {params}! '
+            f'{sys.exc_info()}')
+
+    try:
+        homework_statuses.json()
+    except HTTPError as error:
+        raise ApiResponseError(
+            f'неудалось получить json формат: {error}, {sys.exc_info()}')
     else:
         return homework_statuses.json()
 
@@ -71,12 +75,10 @@ def get_api_answer(current_timestamp: int) -> dict:
 def check_response(response: dict) -> list:
     """проверяем наличие в респонсе словаря homeworks."""
     logger.info(f'Начинаю проверку ответа сервера ({response})')
-    if isinstance(response, list):
-        raise TypeError(
-            f'в респонсе должен быть словарь, а содержится: {type(response)}')
     if not isinstance(response, dict):
         raise ResponseContentError(f'Ошибка: в {response} ожидается словарь, '
-                                   f'а вернулось - {type(response)}')
+                                   f'а вернулось - {type(response)}, '
+                                   f'{sys.exc_info()}')
     if 'homework_status' and 'current_date' not in response:
         raise ResponseContentError(
             f"В response ожидается 'homework_status' и 'current_date', "
@@ -87,7 +89,7 @@ def check_response(response: dict) -> list:
     if not isinstance(homework, list):
         raise ResponseContentError(
             f'в "homework" содержится не list: '
-            f'type(homework)={type(homework)}')
+            f'type(homework)={type(homework)}, {sys.exc_info()}')
     return homework
 
 
@@ -128,10 +130,10 @@ def main():
                 current_timestamp = response['current_date']
                 time.sleep(RETRY_TIME)
             except NotSendsError as error:
-                logger.error(error)
+                logger.error(error, exc_info=True)
             except Exception as error:
                 message = f'Сбой в работе программы: {error}'
-                logger.error(error)
+                logger.error(error, exc_info=True)
                 send_message(bot, message)
                 time.sleep(RETRY_TIME)
     else:

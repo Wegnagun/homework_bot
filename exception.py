@@ -17,16 +17,16 @@ class SendMessageError(NotSendsError):
     pass
 
 
-class ResponseCodeError(NotSendsError):
-    """Коды ответа сервера, отличные от 200."""
+class ResponseContentError(HomeWorkBaseException):
+    """Ошибки содержимого сервера."""
     pass
 
 
-class ApiResponseError(NotSendsError):
+class ApiResponseError(HomeWorkBaseException):
     """Ошибки сервера."""
     pass
 
 
-class ResponseContentError(NotSendsError):
-    """Ошибки содержимого сервера."""
+class ResponseCodeError(HomeWorkBaseException):
+    """Коды ответа сервера, отличные от 200."""
     pass
