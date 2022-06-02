@@ -79,8 +79,8 @@ def check_response(response: dict) -> list:
     logger.info(f'Начинаю проверку ответа сервера ({response})')
     if isinstance(response, list):
         raise TypeError(f'В {response} ожидается словарь, '
-                                   f'а вернулось - {type(response)}, '
-                                   f'{sys.exc_info()}')
+                        f'а вернулось - {type(response)}, '
+                        f'{sys.exc_info()}')
     homework_status = response.get('status')
     current_date = response.get('current_date')
     if 'status' and 'current_date' not in response:
