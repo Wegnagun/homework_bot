@@ -77,7 +77,7 @@ def get_api_answer(current_timestamp: int) -> dict:
 def check_response(response: dict) -> list:
     """проверяем наличие в респонсе словаря homeworks."""
     logger.info(f'Начинаю проверку ответа сервера ({response})')
-    if isinstance(response, list):
+    if not isinstance(response, dict):
         raise TypeError(f'В {response} ожидается словарь, '
                         f'а вернулось - {type(response)}, '
                         f'{sys.exc_info()}')
@@ -130,7 +130,8 @@ def main():
         try:
             response = get_api_answer(current_timestamp)
             homework_list = check_response(response)
-            send_message(bot, parse_status(homework_list[0]))
+            if len(homework_list) > 0:
+                send_message(bot, parse_status(homework_list[0]))
             current_timestamp = response.get('current_date', current_timestamp)
             time.sleep(RETRY_TIME)
         except NotSendsError as error:
