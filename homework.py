@@ -15,7 +15,8 @@ from exception import (SendMessageError,
                        ResponseCodeError,
                        ApiResponseError,
                        NotSendsError,
-                       ResponseContentError)
+                       ResponseContentError,
+                       ResponseContentTypeError)
 
 load_dotenv()
 
@@ -41,7 +42,7 @@ def send_message(bot, message: str):
         bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
     except TelegramError:
         raise SendMessageError(
-            f'не удалось отправить сообщение: "{message}", {sys.exc_info()}')
+            f'не удалось отправить сообщение: "{message}"')
     else:
         logger.info('сообщение успешно отправлено')
 
@@ -53,23 +54,23 @@ def get_api_answer(current_timestamp: int) -> dict:
                   params={'from_date': current_timestamp})
     try:
         logger.info(f'Начат запрос по адресу {ENDPOINT} '
-                    f'с прамаметрами {params}')
+                    f'с парамметрами {params}')
         homework_statuses = requests.get(**params)
+        if homework_statuses.status_code != HTTPStatus.OK:
+            raise ResponseCodeError(
+                f'Ожидался код 200, а получен: '
+                f'{homework_statuses.status_code}, '
+                f'параметры запроса: {params}!')
     except Exception:
         raise ApiResponseError(
             f'Адрес {ENDPOINT} недоступен! '
-            f'параметры запроса: {params}, {sys.exc_info()}')
-    if homework_statuses.status_code != HTTPStatus.OK:
-        raise ResponseCodeError(
-            f'Ожидался код 200, а получен: '
-            f'{homework_statuses.status_code}, параметры запроса: {params}! '
-            f'{sys.exc_info()}')
+            f'параметры запроса: {params}')
 
     try:
         homework_statuses.json()
     except HTTPError as error:
         raise ApiResponseError(
-            f'неудалось получить json формат: {error}, {sys.exc_info()}')
+            f'неудалось получить json формат: {error}')
     else:
         return homework_statuses.json()
 
@@ -79,20 +80,19 @@ def check_response(response: dict) -> list:
     logger.info(f'Начинаю проверку ответа сервера ({response})')
     if not isinstance(response, dict):
         raise TypeError(f'В {response} ожидается словарь, '
-                        f'а вернулось - {type(response)}, '
-                        f'{sys.exc_info()}')
-    homework_status = response.get('status')
+                        f'а вернулось - {type(response)}')
     current_date = response.get('current_date')
-    if 'status' and 'current_date' not in response:
+    if current_date is None:
         raise ResponseContentError(
-            f"В response ожидается 'status' и 'current_date', "
-            f"вернулось: status'={homework_status}, "
+            f"В response ожидается 'current_date': "
             f"current_date={current_date}")
+    if 'homeworks' not in response:
+        raise ResponseContentError("В словаре отсутствует 'homeworks'")
     homeworks = response.get('homeworks')
     if not isinstance(homeworks, list):
-        raise ResponseContentError(
+        raise ResponseContentTypeError(
             f'в "homework" содержится не list: '
-            f'type(homework)={type(homeworks)}, {sys.exc_info()}')
+            f'type(homework)={type(homeworks)}')
     return homeworks
 
 
@@ -101,10 +101,10 @@ def parse_status(homework: dict) -> str:
     logger.info('Начинаем собирать данные из homework')
     homework_status = homework.get('status')
     homework_name = homework.get('homework_name')
-    if homework_name not in homework and homework_name is None:
+    if homework_name is None:
         raise KeyError(f"ключа 'homework_name' нет в {homework}"
                        f"или вернулось None")
-    if homework_status not in HOMEWORK_VERDICTS and homework_status is None:
+    if homework_status not in HOMEWORK_VERDICTS:
         raise ValueError(f"статуса {homework_status} нет в HOMEWORK_VERDICTS"
                          f"или вернулось None")
     verdict = HOMEWORK_VERDICTS[homework_status]
@@ -133,12 +133,11 @@ def main():
             if len(homework_list) > 0:
                 send_message(bot, parse_status(homework_list[0]))
             current_timestamp = response.get('current_date', current_timestamp)
-            time.sleep(RETRY_TIME)
         except NotSendsError as error:
             logger.error(error, exc_info=True)
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
-            logger.error(error, exc_info=True)
+            logger.error(message, exc_info=True)
             send_message(bot, message)
         finally:
             time.sleep(RETRY_TIME)

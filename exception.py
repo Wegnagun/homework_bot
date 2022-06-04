@@ -17,6 +17,11 @@ class SendMessageError(NotSendsError):
     pass
 
 
+class ResponseContentTypeError(NotSendsError):
+    """Ошибки содержимого сервера."""
+    pass
+
+
 class ResponseContentError(HomeWorkBaseException):
     """Ошибки содержимого сервера."""
     pass
