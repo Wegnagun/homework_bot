@@ -61,7 +61,7 @@ def get_api_answer(current_timestamp: int) -> dict:
                 f'Ожидался код 200, а получен: '
                 f'{homework_statuses.status_code}, '
                 f'параметры запроса: {params}!')
-    except ResponseCodeError as error:
+    except ResponseCodeError:
         raise
     except Exception:
         raise ApiResponseError(
