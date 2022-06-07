@@ -35,8 +35,3 @@ class ApiResponseError(HomeWorkBaseException):
 class ResponseCodeError(HomeWorkBaseException):
     """Коды ответа сервера, отличные от 200."""
     pass
-
-
-class CodeError(HomeWorkBaseException):
-    """Коды ответа сервера, отличные от 200."""
-    pass

@@ -16,8 +16,7 @@ from exception import (SendMessageError,
                        ApiResponseError,
                        NotSendsError,
                        ResponseContentError,
-                       ResponseContentTypeError,
-                       CodeError)
+                       ResponseContentTypeError)
 
 load_dotenv()
 
@@ -63,7 +62,7 @@ def get_api_answer(current_timestamp: int) -> dict:
                 f'{homework_statuses.status_code}, '
                 f'параметры запроса: {params}!')
     except ResponseCodeError as error:
-        raise CodeError(error)
+        raise
     except Exception:
         raise ApiResponseError(
             f'Адрес {ENDPOINT} недоступен! '
@@ -90,8 +89,9 @@ def check_response(response: dict) -> list:
             f"В response ожидается 'current_date': "
             f"current_date={current_date}")
     homeworks = response.get('homeworks')
-    if homeworks not in response.values():
-        raise ResponseContentError("В словаре отсутствует 'homeworks'")
+    if homeworks is None:
+        raise ResponseContentError(f"В словаре {homeworks} "
+                                   f"отсутствует 'homeworks'")
     if not isinstance(homeworks, list):
         raise ResponseContentTypeError(
             f'в "homework" содержится не list: '
